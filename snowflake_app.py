@@ -69,16 +69,17 @@ with tabs[0]:
         AND LAST_UPDATED BETWEEN {int(start_date_dt.timestamp())} AND {int(end_date_dt.timestamp())};
     """
 
-    data_query_df = None
-    if st.button("Query Data", type="primary") or True:
-        data_query_df = conn.query(query, ttl="20m").dropna()
-        data_query_df["LAST_UPDATED"] = pd.to_datetime(data_query_df["LAST_UPDATED"], unit="s")
-        st.write(data_query_df)
+    if "data_query_df" not in st.session_state:
+        st.session_state.data_query_df = None
+    if st.button("Query Data", type="primary"):
+        st.session_state.data_query_df = conn.query(query, ttl="20m").dropna()
+        st.session_state.data_query_df["LAST_UPDATED"] = pd.to_datetime(st.session_state.data_query_df["LAST_UPDATED"], unit="s")
+        st.write(st.session_state.data_query_df)
 
 
 # --- Visualizations Tab ---
 with tabs[1]:
-    if data_query_df is None:
+    if st.session_state.data_query_df is None:
         st.warning("Please run a query in the Database tab first.")
 
     else:
@@ -86,25 +87,25 @@ with tabs[1]:
         st.subheader("📈 Mechanical and E-Bike Availability")
 
         metrics_cols = st.columns(4)
-        metrics_cols[0].metric("Station ID", int(data_query_df["STATION_ID"][0]))
-        metrics_cols[1].metric("Avg. Mech. Bikes", int(data_query_df["MECHANICAL"].mean()))
-        metrics_cols[2].metric("Avg. E-Bikes", int(data_query_df["EBIKE"].mean()))
-        metrics_cols[3].metric("Total Station Docks", int(data_query_df[["NUM_DOCKS_AVAILABLE", "EBIKE", "MECHANICAL"]].iloc[0].sum()))
+        metrics_cols[0].metric("Station ID", int(st.session_state.data_query_df["STATION_ID"][0]))
+        metrics_cols[1].metric("Avg. Mech. Bikes", int(st.session_state.data_query_df["MECHANICAL"].mean()))
+        metrics_cols[2].metric("Avg. E-Bikes", int(st.session_state.data_query_df["EBIKE"].mean()))
+        metrics_cols[3].metric("Total Station Docks", int(st.session_state.data_query_df[["NUM_DOCKS_AVAILABLE", "EBIKE", "MECHANICAL"]].iloc[0].sum()))
 
-        st.line_chart(data_query_df[["LAST_UPDATED", "MECHANICAL", "EBIKE"]].set_index("LAST_UPDATED"))
+        st.line_chart(st.session_state.data_query_df[["LAST_UPDATED", "MECHANICAL", "EBIKE"]].set_index("LAST_UPDATED"))
 
         # Analyze the average availability of e-bikes per hour
         st.subheader("⌚ E-Bike Availability by Hour")
 
-        data_query_df["HOUR"] = data_query_df["LAST_UPDATED"].dt.hour
-        hour_analysis_df = data_query_df.groupby("HOUR")["EBIKE"].mean().reset_index().set_index("HOUR")
+        st.session_state.data_query_df["HOUR"] = st.session_state.data_query_df["LAST_UPDATED"].dt.hour
+        hour_analysis_df = st.session_state.data_query_df.groupby("HOUR")["EBIKE"].mean().reset_index().set_index("HOUR")
         st.bar_chart(hour_analysis_df)
         
 
 # --- ML Model Tab ---
 with tabs[2]:
     st.subheader("*Mocked Machine Learning Model (fake prediction)*")
-    if data_query_df is None:
+    if st.session_state.data_query_df is None:
         st.warning("Please run a query in the Database tab first.")
 
     else:
@@ -117,7 +118,7 @@ with tabs[2]:
         preds = None
         if st.button("Predict E-Bike Availability", type="primary"):
             with st.spinner("*🧙‍♂️ Inference...*"):
-                X = data_query_df[["EBIKE"]].values[-30:]
+                X = st.session_state.data_query_df[["EBIKE"]].values[-30:]
                 preds = model.predict(X)
 
         if preds is not None:
